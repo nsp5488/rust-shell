@@ -67,7 +67,7 @@ fn handle_type(input: &str) {
             Some(entry) => print!(
                 "{} is {}\n",
                 command.unwrap().trim(),
-                entry.path().display()
+                entry.path().canonicalize().ok().unwrap().display()
             ),
             None => print!("{}: not found\n", command.unwrap().trim()),
         },
