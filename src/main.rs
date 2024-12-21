@@ -13,9 +13,12 @@ fn main() {
     // Wait for user input
     let stdin = io::stdin();
     let mut input = String::new();
-    stdin.read_line(&mut input).unwrap();
-    let cleaned = input.trim();
 
-    print_command_not_found(cleaned);
-    io::stdout().flush().unwrap();
+    loop {
+        input.clear();
+        stdin.read_line(&mut input).unwrap();
+        let cleaned = input.trim();
+        print_command_not_found(cleaned);
+        io::stdout().flush().unwrap();
+    }
 }
