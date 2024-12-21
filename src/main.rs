@@ -37,7 +37,7 @@ fn main() {
         let command = input.split(' ').next().unwrap().trim();
 
         match command {
-            "exit" => exit(0),
+            "exit" => return,
             "echo" => handle_echo(&input),
             _ => print_command_not_found(command),
         }
