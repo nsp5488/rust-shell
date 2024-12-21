@@ -34,12 +34,12 @@ fn main() {
         input.clear();
         stdin.read_line(&mut input).unwrap();
 
-        let cleaned = input.split(' ').next().unwrap().trim();
+        let command = input.split(' ').next().unwrap().trim();
 
-        match cleaned {
-            "exit" => return,
+        match command {
+            "exit" => exit(0),
             "echo" => handle_echo(&input),
-            _ => print_command_not_found(cleaned),
+            _ => print_command_not_found(command),
         }
 
         io::stdout().flush().unwrap();
