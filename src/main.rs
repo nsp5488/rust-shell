@@ -23,7 +23,13 @@ fn handle_pwd(_command: &str) {
 fn handle_cd(command: &str) {
     let mut line = command.split(' ');
     let cmd = line.next().unwrap().trim(); // discard "cd"
-    let path = path::Path::new(line.next().unwrap().trim());
+    let home = env::var("HOME").ok().unwrap();
+    let path_string = line.next().unwrap_or_else(|| "~").trim();
+
+    let path = match path_string {
+        "~" => path::Path::new(home.as_str()),
+        _ => path::Path::new(path_string),
+    };
     let result = path.try_exists();
     match result {
         Ok(success) => {
