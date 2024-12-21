@@ -11,8 +11,13 @@ fn build_commands() -> HashMap<String, Command> {
     commands.insert("exit".to_string(), handle_exit);
     commands.insert("echo".to_string(), handle_echo);
     commands.insert("type".to_string(), handle_type);
+    commands.insert("pwd".to_string(), handle_pwd);
     return commands;
 }
+fn handle_pwd(_command: &str) {
+    print!("{}\n", std::env::current_dir().unwrap().display());
+}
+
 fn handle_exit(_command: &str) {
     std::process::exit(0);
 }
