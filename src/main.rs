@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::{collections::HashMap, fs::DirEntry};
 type Command = fn(&str) -> ();
 use std::fs;
+use std::path;
 
 fn build_commands() -> HashMap<String, Command> {
     let mut commands: HashMap<String, Command> = HashMap::new();
@@ -12,10 +13,33 @@ fn build_commands() -> HashMap<String, Command> {
     commands.insert("echo".to_string(), handle_echo);
     commands.insert("type".to_string(), handle_type);
     commands.insert("pwd".to_string(), handle_pwd);
+    commands.insert("cd".to_string(), handle_cd);
     return commands;
 }
 fn handle_pwd(_command: &str) {
     print!("{}\n", std::env::current_dir().unwrap().display());
+}
+
+fn handle_cd(command: &str) {
+    let mut line = command.split(' ');
+    let cmd = line.next().unwrap().trim(); // discard "cd"
+    let path = path::Path::new(line.next().unwrap().trim());
+    let result = path.try_exists();
+    match result {
+        Ok(success) => {
+            if success {
+                match std::env::set_current_dir(path) {
+                    Err(e) => print!("{e}"),
+                    Ok(_) => (),
+                }
+            } else {
+                print!("{cmd}: {}: No such file or directory\n", path.display())
+            }
+        }
+        Err(_e) => {
+            print!("{cmd}: {}: No such file or directory\n", path.display())
+        }
+    }
 }
 
 fn handle_exit(_command: &str) {
