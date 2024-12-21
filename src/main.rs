@@ -86,11 +86,27 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
 
         let mut line = input.split(' ');
-
-        let func = commands.get(line.next().unwrap().trim());
+        let command = line.next().unwrap().trim();
+        let func = commands.get(command);
         match func {
             Some(func) => func(&input),
-            None => print_command_not_found(&input),
+            None => match search_in_path(command) {
+                Some(entry) => {
+                    let args = line.map(|e| e.trim()).collect::<Vec<&str>>();
+                    let result = std::process::Command::new(entry.path()).args(args).output();
+                    match result {
+                        Ok(value) => {
+                            let r = io::stdout().write(&value.stdout);
+                            if r.is_err() {
+                                print!("Error while writing results of {command}");
+                            }
+                            ()
+                        }
+                        Err(e) => print!("Error while executing {command}: {e}"),
+                    }
+                }
+                None => print_command_not_found(&input),
+            },
         }
 
         io::stdout().flush().unwrap();
