@@ -37,7 +37,7 @@ fn handle_type(input: &str) {
 
     match known_commands.get(command.unwrap().trim()) {
         Some(_cmd) => print!("{} is a shell builtin\n", command.unwrap().trim()),
-        None => print_command_not_found(command.unwrap().trim()),
+        None => print!("{}: not found\n", command.unwrap().trim()),
     }
 }
 fn main() {
