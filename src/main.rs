@@ -14,10 +14,16 @@ fn main() {
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
+
         input.clear();
         stdin.read_line(&mut input).unwrap();
         let cleaned = input.trim();
-        print_command_not_found(cleaned);
+
+        match cleaned {
+            "exit 0" => return,
+            _ => print_command_not_found(cleaned),
+        }
+
         io::stdout().flush().unwrap();
     }
 }
