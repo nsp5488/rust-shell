@@ -6,6 +6,22 @@ fn print_command_not_found(command: &str) {
     print!("{result}\n");
 }
 
+fn handle_echo(input: &str) {
+    let mut line = input.split(' ');
+    // discard the command
+    line.next();
+
+    // print each value
+    let mut element = line.next();
+    while element != None {
+        print!("{}", element.unwrap());
+        element = line.next();
+        if element != None {
+            print!(" ");
+        }
+    }
+}
+
 fn main() {
     // Wait for user input
     let stdin = io::stdin();
@@ -17,10 +33,12 @@ fn main() {
 
         input.clear();
         stdin.read_line(&mut input).unwrap();
-        let cleaned = input.trim();
+
+        let cleaned = input.split(' ').next().unwrap().trim();
 
         match cleaned {
-            "exit 0" => return,
+            "exit" => return,
+            "echo" => handle_echo(&input),
             _ => print_command_not_found(cleaned),
         }
 
