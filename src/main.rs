@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::env;
 #[allow(unused_imports)]
 use std::io::{self, Write};
-
+use std::{collections::HashMap, fs::DirEntry};
 type Command = fn(&str) -> ();
+use std::fs;
 
 fn build_commands() -> HashMap<String, Command> {
     let mut commands: HashMap<String, Command> = HashMap::new();
@@ -28,6 +29,31 @@ fn handle_echo(input: &str) {
     print!("{}", line.collect::<Vec<&str>>().join(" "));
 }
 
+fn search_in_path(command: &str) -> Option<DirEntry> {
+    let found_path = env::var("PATH").is_ok();
+    if !found_path {
+        return None;
+    }
+    let paths = env::var("PATH");
+    let mut dir_entry: Option<DirEntry> = None;
+    paths.ok().unwrap().split(':').for_each(|path| {
+        let directory = fs::read_dir(path);
+        if directory.is_ok() {
+            let mut listing = directory.ok().unwrap();
+            let found = listing.find(|element| {
+                element.is_ok()
+                    && element.as_ref().ok().unwrap().file_name().to_str().unwrap()
+                        == command.trim()
+            });
+            match found {
+                Some(e) => dir_entry = e.ok(),
+                None => (),
+            }
+        }
+    });
+    dir_entry
+}
+
 fn handle_type(input: &str) {
     let known_commands = build_commands();
     let mut line = input.split(' ');
@@ -37,7 +63,14 @@ fn handle_type(input: &str) {
 
     match known_commands.get(command.unwrap().trim()) {
         Some(_cmd) => print!("{} is a shell builtin\n", command.unwrap().trim()),
-        None => print!("{}: not found\n", command.unwrap().trim()),
+        None => match search_in_path(command.unwrap()) {
+            Some(entry) => print!(
+                "{} is {}\n",
+                command.unwrap().trim(),
+                entry.path().display()
+            ),
+            None => print!("{}: not found\n", command.unwrap().trim()),
+        },
     }
 }
 fn main() {
