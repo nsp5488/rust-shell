@@ -7,14 +7,13 @@ fn print_command_not_found(command: &str) {
 }
 
 fn main() {
-    print!("$ ");
-    io::stdout().flush().unwrap();
-
     // Wait for user input
     let stdin = io::stdin();
     let mut input = String::new();
 
     loop {
+        print!("$ ");
+        io::stdout().flush().unwrap();
         input.clear();
         stdin.read_line(&mut input).unwrap();
         let cleaned = input.trim();
