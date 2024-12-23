@@ -23,28 +23,23 @@ fn handle_pwd(_command: &str) {
 fn handle_cd(command: &str) {
     let mut line = command.split(' ');
     let cmd = line.next().unwrap().trim(); // discard "cd"
-    let home = env::var("HOME").ok().unwrap();
+    let home = env::var("HOME").unwrap();
     let path_string = line.next().unwrap_or_else(|| "~").trim();
 
     let path = match path_string {
         "~" => path::Path::new(home.as_str()),
         _ => path::Path::new(path_string),
     };
-    let result = path.try_exists();
-    match result {
-        Ok(success) => {
-            if success {
-                match std::env::set_current_dir(path) {
-                    Err(e) => print!("{e}"),
-                    Ok(_) => (),
-                }
-            } else {
-                print!("{cmd}: {}: No such file or directory\n", path.display())
+    if let Ok(result) = path.try_exists() {
+        if result {
+            if let Err(e) = std::env::set_current_dir(path) {
+                print!("{e}");
             }
-        }
-        Err(_e) => {
+        } else {
             print!("{cmd}: {}: No such file or directory\n", path.display())
         }
+    } else {
+        print!("{cmd}: {}: No such file or directory\n", path.display())
     }
 }
 
@@ -66,16 +61,18 @@ fn handle_echo(input: &str) {
 
 fn search_in_path(command: &str) -> Option<DirEntry> {
     let found_path = env::var("PATH").is_ok();
+    let mut dir_entry: Option<DirEntry> = None;
+
     if !found_path {
         return None;
     }
-    let paths = env::var("PATH");
-    let mut dir_entry: Option<DirEntry> = None;
-    paths.ok().unwrap().split(':').for_each(|path| {
-        let directory = fs::read_dir(path);
-        if directory.is_ok() {
-            let mut listing = directory.ok().unwrap();
-            let found = listing.find(|element| {
+    let Ok(paths) = env::var("PATH") else {
+        return None;
+    };
+
+    paths.split(':').for_each(|path| {
+        if let Ok(mut directory) = fs::read_dir(path) {
+            let found = directory.find(|element| {
                 element.is_ok()
                     && element.as_ref().ok().unwrap().file_name().to_str().unwrap()
                         == command.trim()
@@ -123,27 +120,31 @@ fn main() {
         let mut line = input.split(' ');
         let command = line.next().unwrap().trim();
         let func = commands.get(command);
-        match func {
-            Some(func) => func(&input),
-            None => match search_in_path(command) {
-                Some(entry) => {
-                    let args = line.map(|e| e.trim()).collect::<Vec<&str>>();
-                    let result = std::process::Command::new(entry.path()).args(args).output();
-                    match result {
-                        Ok(value) => {
-                            let r = io::stdout().write(&value.stdout);
-                            if r.is_err() {
-                                print!("Error while writing results of {command}");
-                            }
-                            ()
-                        }
-                        Err(e) => print!("Error while executing {command}: {e}"),
+        if let Some(func) = func {
+            func(&input);
+        } else {
+            if let Some(entry) = search_in_path(command) {
+                let args = line.map(|e| e.trim()).collect::<Vec<&str>>();
+                let result = std::process::Command::new(entry.path()).args(args).output();
+                if let Ok(value) = result {
+                    let mut r = io::stdout().write(&value.stdout);
+
+                    if r.is_err() {
+                        print!("Error while writing results of {command}");
                     }
+                    r = io::stderr().write(&value.stderr);
+                    if r.is_err() {
+                        print!("Error while writing errors of {command}");
+                    }
+                } else {
+                    print!("Error while executing {command}");
                 }
-                None => print_command_not_found(&input),
-            },
+            } else {
+                print_command_not_found(&input);
+            }
         }
 
         io::stdout().flush().unwrap();
+        io::stderr().flush().unwrap();
     }
 }
