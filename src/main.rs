@@ -89,7 +89,7 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
                     panic!("Could not write to stdio or stderr");
                 };
             } else {
-                print!("{}: command not found", command.as_str());
+                print!("{}: command not found\n", command.as_str());
             }
         }
 
