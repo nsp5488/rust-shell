@@ -40,6 +40,18 @@ fn parse_input(input: &String) -> Option<Vec<String>> {
                 if inner.1 == '\"' {
                     found_match = true;
                     break;
+                } else if inner.1 == '\\' {
+                    if let Some(next) = chars.next() {
+                        match next.1 {
+                            '\\' => current_word.push('\\'),
+                            '$' => current_word.push('$'),
+                            '"' => current_word.push('"'),
+                            _ => {
+                                current_word.push('\\');
+                                current_word.push(next.1);
+                            }
+                        }
+                    }
                 } else {
                     current_word.push(inner.1);
                 }
