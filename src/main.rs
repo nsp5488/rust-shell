@@ -36,7 +36,18 @@ fn parse_input(input: &String) -> Option<Vec<String>> {
             }
             found_match = false;
         } else if c.1 == '\"' {
-            // TODO
+            while let Some(inner) = chars.next() {
+                if inner.1 == '\"' {
+                    found_match = true;
+                    break;
+                } else {
+                    current_word.push(inner.1);
+                }
+            }
+            if !found_match {
+                return None;
+            }
+            found_match = false;
         } else {
             current_word.push(c.1);
         }
