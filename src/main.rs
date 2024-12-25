@@ -48,6 +48,10 @@ fn parse_input(input: &String) -> Option<Vec<String>> {
                 return None;
             }
             found_match = false;
+        } else if c.1 == '\\' {
+            if let Some(escaped) = chars.next() {
+                current_word.push(escaped.1);
+            }
         } else {
             current_word.push(c.1);
         }
