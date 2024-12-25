@@ -3,10 +3,12 @@ pub mod commands {
         collections::HashMap,
         env,
         fs::{self, DirEntry},
+        io::{Error, ErrorKind},
         path,
         process::Output,
     };
-    type Command = fn(&str) -> ();
+    type CommandResult = Result<(), Error>;
+    pub type Command = fn(Vec<String>) -> CommandResult;
 
     pub fn build_commands() -> HashMap<String, Command> {
         let mut commands: HashMap<String, Command> = HashMap::new();
@@ -19,14 +21,10 @@ pub mod commands {
         return commands;
     }
 
-    pub fn execute_command_in_path(
-        command: &str,
-        line: core::str::Split<'_, char>,
-    ) -> Option<Output> {
+    pub fn execute_command_in_path(command: &str, args: Vec<String>) -> Option<Output> {
         let mut command_output: Option<Output> = None;
 
         if let Some(entry) = search_in_path(command) {
-            let args = line.map(|e| e.trim()).collect::<Vec<&str>>();
             let result = std::process::Command::new(entry.path()).args(args).output();
             if let Ok(value) = result {
                 command_output = Some(value);
@@ -64,62 +62,73 @@ pub mod commands {
         dir_entry
     }
 
-    fn handle_pwd(_command: &str) {
+    fn handle_pwd(_args: Vec<String>) -> CommandResult {
         print!("{}\n", std::env::current_dir().unwrap().display());
+        Ok(())
     }
 
-    fn handle_cd(command: &str) {
-        let mut line = command.split(' ');
-        let cmd = line.next().unwrap().trim(); // discard "cd"
+    fn handle_cd(args: Vec<String>) -> CommandResult {
         let home = env::var("HOME").unwrap();
-        let path_string = line.next().unwrap_or_else(|| "~").trim();
+        let path_string = match args.get(0) {
+            Some(e) => e.as_str(),
+            None => "~",
+        };
 
         let path = match path_string {
             "~" => path::Path::new(home.as_str()),
             _ => path::Path::new(path_string),
         };
+        let file_not_found = Error::new(
+            ErrorKind::NotFound,
+            format!("cd: {}: No such file or directory", path.display()),
+        );
         if let Ok(result) = path.try_exists() {
             if result {
-                if let Err(e) = std::env::set_current_dir(path) {
-                    print!("{e}");
+                if let Err(_e) = std::env::set_current_dir(path) {
+                    return Err(file_not_found);
                 }
             } else {
-                print!("{cmd}: {}: No such file or directory\n", path.display())
+                return Err(file_not_found);
             }
         } else {
-            print!("{cmd}: {}: No such file or directory\n", path.display())
+            return Err(file_not_found);
         }
+        return Ok(());
     }
 
-    fn handle_exit(_command: &str) {
+    fn handle_exit(_args: Vec<String>) -> CommandResult {
         std::process::exit(0);
     }
 
-    fn handle_echo(input: &str) {
-        let mut line = input.split(' ');
-        // discard the command
-        line.next();
-
-        print!("{}", line.collect::<Vec<&str>>().join(" "));
+    fn handle_echo(args: Vec<String>) -> CommandResult {
+        print!("{}\n", args.join(" "));
+        Ok(())
     }
 
-    fn handle_type(input: &str) {
+    fn handle_type(args: Vec<String>) -> CommandResult {
         let known_commands = build_commands();
-        let mut line = input.split(' ');
 
-        line.next(); // discard 'type'
-        let command = line.next();
+        let command = match args.get(0) {
+            Some(e) => e.as_str(),
+            None => "",
+        };
 
-        match known_commands.get(command.unwrap().trim()) {
-            Some(_cmd) => print!("{} is a shell builtin\n", command.unwrap().trim()),
-            None => match search_in_path(command.unwrap()) {
+        match known_commands.get(command) {
+            Some(_cmd) => print!("{} is a shell builtin\n", command),
+            None => match search_in_path(command) {
                 Some(entry) => print!(
                     "{} is {}\n",
-                    command.unwrap().trim(),
+                    command,
                     entry.path().canonicalize().ok().unwrap().display()
                 ),
-                None => print!("{}: not found\n", command.unwrap().trim()),
+                None => {
+                    return Err(Error::new(
+                        ErrorKind::NotFound,
+                        format!("{}: not found", command),
+                    ))
+                }
             },
         }
+        return Ok(());
     }
 }
