@@ -5,8 +5,10 @@ pub mod parser {
         pub command: String,
         pub args: Vec<String>,
         pub redirect_stdout: bool,
+        pub append_stdout: bool,
         pub stdout_path: String,
         pub redirect_stderr: bool,
+        pub append_stderr: bool,
         pub stderr_path: String,
     }
 
@@ -16,6 +18,8 @@ pub mod parser {
             args: Vec<String>,
             stdout_path: String,
             stderr_path: String,
+            append_stdout: bool,
+            append_stderr: bool,
         ) -> ParsedData {
             let redirect_stdout = !stdout_path.is_empty();
             let redirect_stderr = !stderr_path.is_empty();
@@ -23,8 +27,10 @@ pub mod parser {
                 command,
                 args,
                 redirect_stdout,
+                append_stdout,
                 stdout_path,
                 redirect_stderr,
+                append_stderr,
                 stderr_path,
             };
         }
@@ -32,7 +38,6 @@ pub mod parser {
 
     fn extract_filename(chars: &mut CharIndices<'_>) -> String {
         let mut filename: Vec<char> = Vec::new();
-        chars.next(); // kill leading space.
         while let Some(c) = chars.next() {
             if c.1.is_whitespace() {
                 return String::from_iter(filename.iter());
@@ -53,15 +58,27 @@ pub mod parser {
 
         let mut pre_redirect: Vec<char> = Vec::new();
         let mut found_redirect: bool = false;
+        let mut append_stdout = false;
+        let mut append_stderr = false;
         while let Some(c) = chars.next() {
             if c.1 == '>' && previous != '\\' {
                 found_redirect = true;
+                let nextchar = chars.next();
+
                 if previous == '1' || previous == ' ' {
                     // redirect stdout
+                    append_stdout = nextchar.unwrap_or((1, 'a')).1 == '>';
+                    if append_stdout {
+                        chars.next();
+                    }
                     stdout_path = extract_filename(&mut chars);
                 }
                 if previous == '2' {
                     // redirect stderr
+                    append_stderr = nextchar.unwrap_or((1, 'a')).1 == '>';
+                    if append_stderr {
+                        chars.next();
+                    }
                     stderr_path = extract_filename(&mut chars);
                 }
             } else {
@@ -139,7 +156,14 @@ pub mod parser {
         command = iter.next().unwrap_or_else(|| "".to_string());
         args = iter.collect();
 
-        let parsed_data = ParsedData::new(command, args, stdout_path, stderr_path);
+        let parsed_data = ParsedData::new(
+            command,
+            args,
+            stdout_path,
+            stderr_path,
+            append_stdout,
+            append_stderr,
+        );
         // handle spaces
         return Some(parsed_data);
     }

@@ -4,13 +4,13 @@ mod shell_commands;
 use crate::parse::parser::parse_input;
 use crate::shell_commands::commands::{build_commands, execute_command_in_path};
 use std::collections::HashMap;
-use std::fs;
+use std::fs::OpenOptions;
 use std::io::BufWriter;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
-fn get_filewriter(file_path: &str) -> Option<BufWriter<Box<dyn Write>>> {
-    let file_result = fs::File::create_new(file_path);
+fn get_filewriter(file_path: &str, append: bool) -> Option<BufWriter<Box<dyn Write>>> {
+    let file_result = OpenOptions::new().append(append).open(file_path);
     if let Ok(file) = file_result {
         return Some(BufWriter::new(Box::new(file)));
     } else {
@@ -18,18 +18,18 @@ fn get_filewriter(file_path: &str) -> Option<BufWriter<Box<dyn Write>>> {
     }
 }
 
-fn get_stdout(redirect: bool, file_path: &str) -> BufWriter<Box<dyn Write>> {
+fn get_stdout(redirect: bool, file_path: &str, append: bool) -> BufWriter<Box<dyn Write>> {
     if redirect {
-        if let Some(writer) = get_filewriter(file_path) {
+        if let Some(writer) = get_filewriter(file_path, append) {
             return writer;
         }
     }
     return BufWriter::new(Box::new(std::io::stdout().lock()));
 }
 
-fn get_stderr(redirect: bool, file_path: &str) -> BufWriter<Box<dyn Write>> {
+fn get_stderr(redirect: bool, file_path: &str, append: bool) -> BufWriter<Box<dyn Write>> {
     if redirect {
-        if let Some(writer) = get_filewriter(file_path) {
+        if let Some(writer) = get_filewriter(file_path, append) {
             return writer;
         }
     }
@@ -66,8 +66,16 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
                 continue;
             }
         };
-        let out_writer = get_stdout(parsed_data.redirect_stdout, &parsed_data.stdout_path);
-        let err_writer = get_stderr(parsed_data.redirect_stderr, &parsed_data.stderr_path);
+        let out_writer = get_stdout(
+            parsed_data.redirect_stdout,
+            &parsed_data.stdout_path,
+            parsed_data.append_stdout,
+        );
+        let err_writer = get_stderr(
+            parsed_data.redirect_stderr,
+            &parsed_data.stderr_path,
+            parsed_data.append_stderr,
+        );
         // evaluate
         let func = commands.get(parsed_data.command.as_str());
         if let Some(func) = func {
