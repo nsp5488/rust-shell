@@ -36,7 +36,7 @@ pub mod commands {
         } else {
             return Err(Error::new(
                 ErrorKind::NotFound,
-                format!("Command {command} not found\n"),
+                format!("{command}: command not found\n"),
             ));
         }
     }
