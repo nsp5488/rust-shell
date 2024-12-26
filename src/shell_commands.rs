@@ -27,7 +27,6 @@ pub mod commands {
     ) -> Result<Option<Output>, Error> {
         if let Some(entry) = search_in_path(command) {
             let result = std::process::Command::new(entry.path()).args(args).output();
-
             match result {
                 Ok(value) => return Ok(Some(value)),
                 Err(e) => return Err(e),
