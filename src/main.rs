@@ -68,7 +68,6 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
         };
         let out_writer = get_stdout(parsed_data.redirect_stdout, &parsed_data.stdout_path);
         let err_writer = get_stderr(parsed_data.redirect_stderr, &parsed_data.stderr_path);
-        print!("{:#?}", parsed_data);
         // evaluate
         let func = commands.get(parsed_data.command.as_str());
         if let Some(func) = func {
