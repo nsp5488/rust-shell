@@ -1,3 +1,4 @@
+// Contains the builtin commands that the shell supports, as well as a method for finding and executing commands from PATH
 pub mod commands {
     use std::{
         collections::HashMap,
@@ -8,8 +9,11 @@ pub mod commands {
         process::Output,
     };
     type CommandResult = Result<String, Error>;
+
+    // A command that takes a list of arguments and produces a result
     pub type Command = fn(Vec<String>) -> CommandResult;
 
+    // Build a map from string -> function of commands (command pattern)
     pub fn build_commands() -> HashMap<String, Command> {
         let mut commands: HashMap<String, Command> = HashMap::new();
 
@@ -21,6 +25,7 @@ pub mod commands {
         return commands;
     }
 
+    // Attempt to execute a command that may be found in the PATH variable
     pub fn execute_command_in_path(
         command: &str,
         args: Vec<String>,

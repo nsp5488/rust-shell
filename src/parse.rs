@@ -4,34 +4,46 @@ pub mod parser {
     pub struct ParsedData {
         pub command: String,
         pub args: Vec<String>,
+        pub redirect_info: RedirectInfo,
+    }
+    #[derive(Debug)]
+    pub struct RedirectInfo {
         pub redirect_stdout: bool,
         pub append_stdout: bool,
         pub stdout_path: String,
         pub redirect_stderr: bool,
         pub append_stderr: bool,
         pub stderr_path: String,
+        remaining: String,
     }
 
     impl ParsedData {
+        fn new(command: String, args: Vec<String>, redirect_info: RedirectInfo) -> ParsedData {
+            return ParsedData {
+                command,
+                args,
+                redirect_info,
+            };
+        }
+    }
+    impl RedirectInfo {
         fn new(
-            command: String,
-            args: Vec<String>,
             stdout_path: String,
             stderr_path: String,
             append_stdout: bool,
             append_stderr: bool,
-        ) -> ParsedData {
+            remaining: String,
+        ) -> RedirectInfo {
             let redirect_stdout = !stdout_path.is_empty();
             let redirect_stderr = !stderr_path.is_empty();
-            return ParsedData {
-                command,
-                args,
+            return RedirectInfo {
                 redirect_stdout,
                 append_stdout,
                 stdout_path,
                 redirect_stderr,
                 append_stderr,
                 stderr_path,
+                remaining,
             };
         }
     }
@@ -47,11 +59,9 @@ pub mod parser {
         }
         return "".to_string();
     }
-    pub fn parse_input(input: &String) -> Option<ParsedData> {
-        let mut parsed_input: Vec<String> = Vec::new();
 
+    fn parse_redirect(input: &String) -> RedirectInfo {
         let mut chars = input.char_indices();
-        let mut found_match = false;
         let mut previous: char = 'a'; // default value that is not a special case.
         let mut stdout_path: String = "".to_string();
         let mut stderr_path: String = "".to_string();
@@ -88,11 +98,29 @@ pub mod parser {
                 previous = c.1;
             }
         }
+
+        // Rebuild the original string upto the beginning of the redirects
         pre_redirect.push('\n');
         let mut iter_pre_redirect = pre_redirect.iter();
         iter_pre_redirect.next(); // consume the 'a' default value
-        let main_command = String::from_iter(iter_pre_redirect);
-        chars = main_command.char_indices();
+        let remaining = String::from_iter(iter_pre_redirect);
+
+        return RedirectInfo::new(
+            stdout_path,
+            stderr_path,
+            append_stdout,
+            append_stderr,
+            remaining,
+        );
+    }
+
+    pub fn parse_input(input: &String) -> Option<ParsedData> {
+        let mut parsed_input: Vec<String> = Vec::new();
+
+        let mut found_match = false;
+
+        let redirect_info = parse_redirect(input);
+        let mut chars = redirect_info.remaining.char_indices();
         let mut current_word: Vec<char> = Vec::new();
         while let Some(c) = chars.next() {
             if c.1.is_ascii_whitespace() {
@@ -156,14 +184,7 @@ pub mod parser {
         command = iter.next().unwrap_or_else(|| "".to_string());
         args = iter.collect();
 
-        let parsed_data = ParsedData::new(
-            command,
-            args,
-            stdout_path,
-            stderr_path,
-            append_stdout,
-            append_stderr,
-        );
+        let parsed_data = ParsedData::new(command, args, redirect_info);
         // handle spaces
         return Some(parsed_data);
     }

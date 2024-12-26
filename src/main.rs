@@ -1,69 +1,29 @@
+mod output;
 mod parse;
 mod shell_commands;
 
+use crate::output::output::{get_stderr, get_stdout, print};
 use crate::parse::parser::parse_input;
 use crate::shell_commands::commands::{build_commands, execute_command_in_path};
+
 use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::BufWriter;
-#[allow(unused_imports)]
-use std::io::{self, Write};
+use std::io::Write;
 
-fn get_filewriter(file_path: &str, append: bool) -> Option<BufWriter<Box<dyn Write>>> {
-    let file_result = OpenOptions::new()
-        .append(append)
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(file_path);
-    if let Ok(file) = file_result {
-        return Some(BufWriter::new(Box::new(file)));
-    } else {
-        return None;
-    }
-}
-
-fn get_stdout(redirect: bool, file_path: &str, append: bool) -> BufWriter<Box<dyn Write>> {
-    if redirect {
-        if let Some(writer) = get_filewriter(file_path, append) {
-            return writer;
-        }
-    }
-    return BufWriter::new(Box::new(std::io::stdout().lock()));
-}
-
-fn get_stderr(redirect: bool, file_path: &str, append: bool) -> BufWriter<Box<dyn Write>> {
-    if redirect {
-        if let Some(writer) = get_filewriter(file_path, append) {
-            return writer;
-        }
-    }
-    return BufWriter::new(Box::new(std::io::stderr().lock()));
-}
-
-fn print(mut writer: impl std::io::Write, value: &[u8]) {
-    let result = writer.write(value);
-
-    match result {
-        Ok(_) => (),
-        Err(_) => eprint!("Could not write output"),
-    }
-    writer.flush().unwrap();
-}
-
+// Main REPL loop for the shell.
 fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Command>) {
-    let stdin = io::stdin();
+    let stdin = std::io::stdin();
     let mut input = String::new();
 
     loop {
         // read
         print!("$ ");
-        io::stdout().flush().unwrap();
+        std::io::stdout().flush().unwrap();
 
         input.clear();
         stdin.read_line(&mut input).unwrap();
-        let parsed = parse_input(&input);
 
+        // parse
+        let parsed = parse_input(&input);
         let parsed_data = match parsed {
             Some(e) => e,
             None => {
@@ -72,24 +32,27 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
             }
         };
         let out_writer = get_stdout(
-            parsed_data.redirect_stdout,
-            &parsed_data.stdout_path,
-            parsed_data.append_stdout,
+            parsed_data.redirect_info.redirect_stdout,
+            &parsed_data.redirect_info.stdout_path,
+            parsed_data.redirect_info.append_stdout,
         );
         let err_writer = get_stderr(
-            parsed_data.redirect_stderr,
-            &parsed_data.stderr_path,
-            parsed_data.append_stderr,
+            parsed_data.redirect_info.redirect_stderr,
+            &parsed_data.redirect_info.stderr_path,
+            parsed_data.redirect_info.append_stderr,
         );
+
         // evaluate
         let func = commands.get(parsed_data.command.as_str());
         if let Some(func) = func {
+            // print
             match func(parsed_data.args) {
                 Ok(value) => print(out_writer, &value.as_bytes()),
                 Err(e) => print(err_writer, &e.to_string().as_bytes()),
             };
         } else {
             match execute_command_in_path(parsed_data.command.as_str(), parsed_data.args) {
+                // print
                 Ok(output) => {
                     if let Some(value) = output {
                         print(out_writer, &value.stdout);
@@ -107,6 +70,7 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
 }
 
 fn main() {
+    // Get shell builtins
     let commands: HashMap<String, crate::shell_commands::commands::Command> = build_commands();
     read_eval_print(commands);
 }
