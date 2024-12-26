@@ -1,81 +1,55 @@
+mod parse;
 mod shell_commands;
+
+use crate::parse::parser::parse_input;
 use crate::shell_commands::commands::{build_commands, execute_command_in_path};
 use std::collections::HashMap;
+use std::fs;
+use std::io::BufWriter;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
-fn parse_input(input: &String) -> Option<Vec<String>> {
-    let mut parsed_input: Vec<String> = Vec::new();
+fn get_filewriter(file_path: &str) -> Option<BufWriter<Box<dyn Write>>> {
+    let file_result = fs::File::create_new(file_path);
+    if let Ok(file) = file_result {
+        return Some(BufWriter::new(Box::new(file)));
+    } else {
+        return None;
+    }
+}
 
-    // handle quotes
-    let mut chars = input.char_indices();
-    let mut found_match = false;
-
-    let mut current_word: Vec<char> = Vec::new();
-    while let Some(c) = chars.next() {
-        if c.1.is_ascii_whitespace() {
-            // end arg if not in a quote
-            if current_word.len() == 0 {
-                continue;
-            }
-            let s = String::from_iter(current_word.iter());
-            current_word.clear();
-            parsed_input.push(s);
-        } else if c.1 == '\'' {
-            // consume characters until we find a matching quote
-            while let Some(inner) = chars.next() {
-                if inner.1 == '\'' {
-                    found_match = true;
-                    break;
-                } else {
-                    current_word.push(inner.1);
-                }
-            }
-            if !found_match {
-                return None;
-            }
-            found_match = false;
-        } else if c.1 == '\"' {
-            while let Some(inner) = chars.next() {
-                if inner.1 == '\"' {
-                    found_match = true;
-                    break;
-                } else if inner.1 == '\\' {
-                    if let Some(next) = chars.next() {
-                        match next.1 {
-                            '\\' => current_word.push('\\'),
-                            '$' => current_word.push('$'),
-                            '"' => current_word.push('"'),
-                            _ => {
-                                current_word.push('\\');
-                                current_word.push(next.1);
-                            }
-                        }
-                    }
-                } else {
-                    current_word.push(inner.1);
-                }
-            }
-            if !found_match {
-                return None;
-            }
-            found_match = false;
-        } else if c.1 == '\\' {
-            if let Some(escaped) = chars.next() {
-                current_word.push(escaped.1);
-            }
-        } else {
-            current_word.push(c.1);
+fn get_stdout(redirect: bool, file_path: &str) -> BufWriter<Box<dyn Write>> {
+    if redirect {
+        if let Some(writer) = get_filewriter(file_path) {
+            return writer;
         }
     }
+    return BufWriter::new(Box::new(std::io::stdout().lock()));
+}
 
-    // handle spaces
-    return Some(parsed_input);
+fn get_stderr(redirect: bool, file_path: &str) -> BufWriter<Box<dyn Write>> {
+    if redirect {
+        if let Some(writer) = get_filewriter(file_path) {
+            return writer;
+        }
+    }
+    return BufWriter::new(Box::new(std::io::stderr().lock()));
+}
+
+fn print(mut writer: impl std::io::Write, value: &[u8]) {
+    let result = writer.write(value);
+
+    match result {
+        Ok(_) => (),
+        Err(_) => eprint!("Could not write output"),
+    }
+    writer.flush().unwrap();
 }
 
 fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Command>) {
     let stdin = io::stdin();
     let mut input = String::new();
+
     loop {
         // read
         print!("$ ");
@@ -84,45 +58,39 @@ fn read_eval_print(commands: HashMap<String, crate::shell_commands::commands::Co
         input.clear();
         stdin.read_line(&mut input).unwrap();
         let parsed = parse_input(&input);
-        let command: String;
-        let args: Vec<String>;
-        match parsed {
-            Some(e) => {
-                let mut iter = e.into_iter();
-                command = iter.next().unwrap_or_else(|| "".to_string());
-                args = iter.collect();
-            }
+
+        let parsed_data = match parsed {
+            Some(e) => e,
             None => {
-                io::stderr()
-                    .write("Error parsing input\n".as_bytes())
-                    .expect("Panic if we cannot write to screen");
+                print(std::io::stderr(), "Error parsing input\n".as_bytes());
                 continue;
             }
-        }
+        };
+        let out_writer = get_stdout(parsed_data.redirect_stdout, &parsed_data.stdout_path);
+        let err_writer = get_stderr(parsed_data.redirect_stderr, &parsed_data.stderr_path);
+        print!("{:#?}", parsed_data);
         // evaluate
-
-        let func = commands.get(command.as_str());
+        let func = commands.get(parsed_data.command.as_str());
         if let Some(func) = func {
-            if let Err(e) = func(args) {
-                print!("{}\n", e.to_string());
+            match func(parsed_data.args) {
+                Ok(value) => print(out_writer, &value.as_bytes()),
+                Err(e) => print(err_writer, &e.to_string().as_bytes()),
             };
         } else {
-            if let Some(value) = execute_command_in_path(command.as_str(), args) {
-                let (Ok(_res1), Ok(_res2)) = (
-                    // print
-                    io::stdout().write(&value.stdout),
-                    io::stderr().write(&value.stderr),
-                ) else {
-                    panic!("Could not write to stdio or stderr");
-                };
-            } else {
-                print!("{}: command not found\n", command.as_str());
+            match execute_command_in_path(parsed_data.command.as_str(), parsed_data.args) {
+                Ok(output) => {
+                    if let Some(value) = output {
+                        print(out_writer, &value.stdout);
+                        print(err_writer, &value.stderr);
+                    }
+                }
+                Err(e) => {
+                    print(err_writer, e.to_string().as_bytes());
+                }
             }
         }
 
         // loop
-        io::stdout().flush().unwrap();
-        io::stderr().flush().unwrap();
     }
 }
 

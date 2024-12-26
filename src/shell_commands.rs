@@ -7,7 +7,7 @@ pub mod commands {
         path,
         process::Output,
     };
-    type CommandResult = Result<(), Error>;
+    type CommandResult = Result<String, Error>;
     pub type Command = fn(Vec<String>) -> CommandResult;
 
     pub fn build_commands() -> HashMap<String, Command> {
@@ -21,18 +21,23 @@ pub mod commands {
         return commands;
     }
 
-    pub fn execute_command_in_path(command: &str, args: Vec<String>) -> Option<Output> {
-        let mut command_output: Option<Output> = None;
-
+    pub fn execute_command_in_path(
+        command: &str,
+        args: Vec<String>,
+    ) -> Result<Option<Output>, Error> {
         if let Some(entry) = search_in_path(command) {
             let result = std::process::Command::new(entry.path()).args(args).output();
-            if let Ok(value) = result {
-                command_output = Some(value);
-            } else {
-                print!("Error while executing {command}");
+
+            match result {
+                Ok(value) => return Ok(Some(value)),
+                Err(e) => return Err(e),
             }
+        } else {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("Command {command} not found\n"),
+            ));
         }
-        return command_output;
     }
 
     fn search_in_path(command: &str) -> Option<DirEntry> {
@@ -63,8 +68,7 @@ pub mod commands {
     }
 
     fn handle_pwd(_args: Vec<String>) -> CommandResult {
-        print!("{}\n", std::env::current_dir().unwrap().display());
-        Ok(())
+        Ok(format!("{}\n", std::env::current_dir().unwrap().display()))
     }
 
     fn handle_cd(args: Vec<String>) -> CommandResult {
@@ -80,7 +84,7 @@ pub mod commands {
         };
         let file_not_found = Error::new(
             ErrorKind::NotFound,
-            format!("cd: {}: No such file or directory", path.display()),
+            format!("cd: {}: No such file or directory\n", path.display()),
         );
         if let Ok(result) = path.try_exists() {
             if result {
@@ -93,7 +97,7 @@ pub mod commands {
         } else {
             return Err(file_not_found);
         }
-        return Ok(());
+        return Ok("".to_string());
     }
 
     fn handle_exit(_args: Vec<String>) -> CommandResult {
@@ -101,8 +105,7 @@ pub mod commands {
     }
 
     fn handle_echo(args: Vec<String>) -> CommandResult {
-        print!("{}\n", args.join(" "));
-        Ok(())
+        Ok(format!("{}\n", args.join(" ")))
     }
 
     fn handle_type(args: Vec<String>) -> CommandResult {
@@ -114,21 +117,20 @@ pub mod commands {
         };
 
         match known_commands.get(command) {
-            Some(_cmd) => print!("{} is a shell builtin\n", command),
-            None => match search_in_path(command) {
-                Some(entry) => print!(
-                    "{} is {}\n",
-                    command,
-                    entry.path().canonicalize().ok().unwrap().display()
-                ),
-                None => {
-                    return Err(Error::new(
+            Some(_cmd) => return Ok(format!("{} is a shell builtin\n", command)),
+            None => {
+                return match search_in_path(command) {
+                    Some(entry) => Ok(format!(
+                        "{} is {}\n",
+                        command,
+                        entry.path().canonicalize().ok().unwrap().display()
+                    )),
+                    None => Err(Error::new(
                         ErrorKind::NotFound,
-                        format!("{}: not found", command),
-                    ))
+                        format!("{}: not found\n", command),
+                    )),
                 }
-            },
+            }
         }
-        return Ok(());
     }
 }
