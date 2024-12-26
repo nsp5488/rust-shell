@@ -10,7 +10,10 @@ use std::io::BufWriter;
 use std::io::{self, Write};
 
 fn get_filewriter(file_path: &str, append: bool) -> Option<BufWriter<Box<dyn Write>>> {
-    let file_result = OpenOptions::new().append(append).open(file_path);
+    let file_result = OpenOptions::new()
+        .create(true)
+        .append(append)
+        .open(file_path);
     if let Ok(file) = file_result {
         return Some(BufWriter::new(Box::new(file)));
     } else {
