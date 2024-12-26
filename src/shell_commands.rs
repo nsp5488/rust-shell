@@ -26,7 +26,9 @@ pub mod commands {
         args: Vec<String>,
     ) -> Result<Option<Output>, Error> {
         if let Some(entry) = search_in_path(command) {
-            let result = std::process::Command::new(entry.path()).args(args).output();
+            let result = std::process::Command::new(entry.file_name())
+                .args(args)
+                .output();
             match result {
                 Ok(value) => return Ok(Some(value)),
                 Err(e) => return Err(e),
